@@ -1,0 +1,89 @@
+version: '2'
+
+services:
+  puppet:
+    container_name: puppet
+    hostname: puppet
+    restart: unless-stopped
+    build: docker/puppetserver
+    ports:
+      - "8140:8140"
+    volumes:
+      - ./code:/etc/puppetlabs/code/
+      - ./puppet/ssl:/etc/puppetlabs/puppet/ssl/
+      - ./puppet/serverdata:/opt/puppetlabs/server/data/puppetserver/
+    # In some cases unqualified hostnames can have the .local suffix
+    # added, I've seen this under Docker of Mac Beta for instance.
+    # Due to needing to access PuppetDB on same hostame as signed in the
+    # certificate you may need to uncommant the following lines
+    environment:
+      - "PUPPETDB_SERVER_URLS=https://puppetdb:8081"
+      - "PUPPETSERVER_JAVA_ARGS=-Xms1g -Xmx4g"
+    links:
+      - "puppetdb:puppetdb"
+
+  puppetdbpostgres:
+    container_name: postgres
+    image: puppet/puppetdb-postgres
+    environment:
+      - POSTGRES_PASSWORD=puppetdb
+      - POSTGRES_USER=puppetdb
+    expose:
+      - "5432"
+    volumes:
+      - ./puppetdb-postgres/data:/var/lib/postgresql/data/
+
+  puppetdb:
+    hostname: puppetdb
+    restart: unless-stopped
+    build: docker/puppetdb
+    ports:
+      - "8080"
+      - "8081"
+    volumes:
+      - ./puppetdb/ssl:/etc/puppetlabs/puppet/ssl/
+    environment:
+      - "PUPPETDB_JAVA_ARGS=-Djava.net.preferIPv4Stack=true -Xms512m -Xmx2g"
+
+  puppetboard:
+    image: puppet/puppetboard:0.2.0
+    restart: unless-stopped
+    ports:
+      - "8000"
+    environment:
+      - "VIRTUAL_HOST=puppetboard.${DNSDOMAIN}"
+      - "LETSENCRYPT_HOST=puppetboard.${DNSDOMAIN}"
+      - "LETSENCRYPT_EMAIL=${EMAIL}"
+
+  puppetexplorer:
+    image: puppet/puppetexplorer
+    restart: unless-stopped
+    ports:
+      - "80"
+    read_only: true
+    environment:
+      - "VIRTUAL_HOST=puppetexplorer.${DNSDOMAIN}"
+      - "LETSENCRYPT_HOST=puppetexplorer.${DNSDOMAIN}"
+      - "LETSENCRYPT_EMAIL=${EMAIL}"
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: unless-stopped
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /etc/nginx/certs:/etc/nginx/certs:ro
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+
+#   nginx-letsencrypt-proxy:
+#     image: jrcs/letsencrypt-nginx-proxy-companion
+#     restart: unless-stopped
+#     volumes:
+#       - /var/run/docker.sock:/var/run/docker.sock:ro
+#       - /etc/nginx/certs:/etc/nginx/certs:rw
+#     volumes_from:
+#       - nginx-proxy

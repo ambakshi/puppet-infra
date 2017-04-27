@@ -1,0 +1,5 @@
+# Container volumes
+.env
+/puppet
+/puppetdb
+/puppetdb-postgres
