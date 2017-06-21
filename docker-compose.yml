@@ -3,7 +3,7 @@ version: '2'
 services:
   puppet:
     container_name: puppet
-    hostname: puppet
+    hostname: ${PUPPETSERVER_HOSTNAME}
     restart: unless-stopped
     build: docker/puppetserver
     ports:
@@ -17,17 +17,18 @@ services:
     # Due to needing to access PuppetDB on same hostame as signed in the
     # certificate you may need to uncommant the following lines
     environment:
-      - "PUPPETDB_SERVER_URLS=https://puppetdb:8081"
-      - "PUPPETSERVER_JAVA_ARGS=-Xms1g -Xmx4g"
+      - "PUPPETDB_SERVER_URLS=${PUPPETDB_SERVER_URLS}"
+      - "PUPPETSERVER_JAVA_ARGS=${PUPPETSERVER_JAVA_ARGS}"
     links:
       - "puppetdb:puppetdb"
 
   puppetdbpostgres:
     container_name: postgres
     image: puppet/puppetdb-postgres
+    restart: unless-stopped
     environment:
-      - POSTGRES_PASSWORD=puppetdb
-      - POSTGRES_USER=puppetdb
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
     expose:
       - "5432"
     volumes:
@@ -38,18 +39,17 @@ services:
     restart: unless-stopped
     build: docker/puppetdb
     ports:
-      - "8080"
-      - "8081"
+      - "8081:8081"
     volumes:
       - ./puppetdb/ssl:/etc/puppetlabs/puppet/ssl/
     environment:
-      - "PUPPETDB_JAVA_ARGS=-Djava.net.preferIPv4Stack=true -Xms512m -Xmx2g"
+      - "PUPPETDB_JAVA_ARGS=${PUPPETDB_JAVA_ARGS}"
+      - "VIRTUAL_HOST=puppetb.${DNSDOMAIN}"
+      - "VIRTUAL_PORT=8080"
 
   puppetboard:
-    image: puppet/puppetboard:0.2.0
+    image: ambakshi/puppetboard:0.2.2
     restart: unless-stopped
-    ports:
-      - "8000"
     environment:
       - "VIRTUAL_HOST=puppetboard.${DNSDOMAIN}"
       - "LETSENCRYPT_HOST=puppetboard.${DNSDOMAIN}"
@@ -58,8 +58,6 @@ services:
   puppetexplorer:
     image: puppet/puppetexplorer
     restart: unless-stopped
-    ports:
-      - "80"
     read_only: true
     environment:
       - "VIRTUAL_HOST=puppetexplorer.${DNSDOMAIN}"

@@ -3,3 +3,4 @@
 /puppet
 /puppetdb
 /puppetdb-postgres
+/code/environments/*/

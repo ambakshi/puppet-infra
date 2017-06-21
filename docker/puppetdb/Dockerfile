@@ -1,3 +1,6 @@
 FROM puppet/puppetdb:4.3.0
 
-RUN apt-get update -qq && apt-get install -y -qq lsb-release vim-nox
+# PUPPETDB_VERSION=4.4.0
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -qq && apt-get upgrade -y && apt-get install -y lsb-release vim-nox
