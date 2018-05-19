@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 services:
   puppet:
@@ -17,24 +17,32 @@ services:
     # Due to needing to access PuppetDB on same hostame as signed in the
     # certificate you may need to uncommant the following lines
     environment:
+      - "container=docker"
+      - "FACTER_role=puppet"
+      - "FACTER_cluster=puppet"
       - "PUPPETDB_SERVER_URLS=${PUPPETDB_SERVER_URLS}"
       - "PUPPETSERVER_JAVA_ARGS=${PUPPETSERVER_JAVA_ARGS}"
-    links:
-      - "puppetdb:puppetdb"
+    networks:
+      - puppet
 
   puppetdbpostgres:
     container_name: postgres
-    image: puppet/puppetdb-postgres
+    hostname: postgres
+    image: puppet/puppetdb-postgres:9.6.3
     restart: unless-stopped
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_USER=${POSTGRES_USER}
+      - "container=docker"
     expose:
       - "5432"
     volumes:
       - ./puppetdb-postgres/data:/var/lib/postgresql/data/
+    networks:
+      - puppet
 
   puppetdb:
+    container_name: puppetdb
     hostname: puppetdb
     restart: unless-stopped
     build: docker/puppetdb
@@ -43,9 +51,14 @@ services:
     volumes:
       - ./puppetdb/ssl:/etc/puppetlabs/puppet/ssl/
     environment:
+      - "container=docker"
+      - "FACTER_role=puppetdb"
+      - "FACTER_cluster=puppet"
       - "PUPPETDB_JAVA_ARGS=${PUPPETDB_JAVA_ARGS}"
       - "VIRTUAL_HOST=puppetb.${DNSDOMAIN}"
       - "VIRTUAL_PORT=8080"
+    networks:
+      - puppet
 
   puppetboard:
     image: ambakshi/puppetboard:0.2.2
@@ -53,7 +66,10 @@ services:
     environment:
       - "VIRTUAL_HOST=puppetboard.${DNSDOMAIN}"
       - "LETSENCRYPT_HOST=puppetboard.${DNSDOMAIN}"
+      - "container=docker"
       - "LETSENCRYPT_EMAIL=${EMAIL}"
+    networks:
+      - puppet
 
   puppetexplorer:
     image: puppet/puppetexplorer
@@ -63,6 +79,10 @@ services:
       - "VIRTUAL_HOST=puppetexplorer.${DNSDOMAIN}"
       - "LETSENCRYPT_HOST=puppetexplorer.${DNSDOMAIN}"
       - "LETSENCRYPT_EMAIL=${EMAIL}"
+    networks:
+      - puppet
+    environment:
+      - "container=docker"
 
   nginx-proxy:
     image: jwilder/nginx-proxy
@@ -71,11 +91,17 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    networks:
+      - puppet
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - /etc/nginx/certs:/etc/nginx/certs:ro
       - /etc/nginx/vhost.d
       - /usr/share/nginx/html
+
+networks:
+  puppet:
+    driver: bridge
 
 #   nginx-letsencrypt-proxy:
 #     image: jrcs/letsencrypt-nginx-proxy-companion
